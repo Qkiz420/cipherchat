@@ -1,0 +1,163 @@
+{
+  "app_name": "CipherChat",
+  "personality": "7. Dark-First Utility DARK",
+  "personality_one_liner": "A highly tactical, command-center interface where cryptographic security is visible, legible, and structurally enforced through dark obsidian layers and acid lime accents.",
+  "color": {
+    "surface": "#090A0B",
+    "onSurface": "#FFFFFF",
+    "surfaceSecondary": "#141517",
+    "onSurfaceSecondary": "#EAEBEB",
+    "surfaceTertiary": "#1C1D20",
+    "onSurfaceTertiary": "#C0C2C4",
+    "surfaceInverse": "#FFFFFF",
+    "onSurfaceInverse": "#090A0B",
+    "brand": "#CCFF00",
+    "onBrand": "#090A0B",
+    "brandPrimary": "#CCFF00",
+    "onBrandPrimary": "#090A0B",
+    "brandSecondary": "#1C1D20",
+    "onBrandSecondary": "#CCFF00",
+    "brandTertiary": "#262F00",
+    "onBrandTertiary": "#CCFF00",
+    "success": "#00E676",
+    "onSuccess": "#002D15",
+    "warning": "#FFB000",
+    "onWarning": "#332300",
+    "error": "#FF3B30",
+    "onError": "#4A0704",
+    "info": "#787A7D",
+    "onInfo": "#FFFFFF",
+    "border": "#2A2B2D",
+    "borderStrong": "#3C3D40",
+    "divider": "#1F2022",
+    "muted": "#787A7D"
+  },
+  "typography": {
+    "displayFontFamily": "Rajdhani",
+    "textFontFamily": "Satoshi",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Use tight, tactical spacing (sm/md). Rely on strict dividers and tonal separation rather than large whitespace or shadows. Avoid decorative padding; maximize data density and scanability.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": "0",
+  "navigation": "bottom_tabs",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": false,
+    "do's": [
+      "Use solid surfaceSecondary and surfaceTertiary to build depth.",
+      "Rely on strict tonal blocks instead of blur, matching the operational command-center aesthetic."
+    ],
+    "dont's": [
+      "Do not use glassmorphism or blur effects.",
+      "Avoid translucent overlays that soften the sharp, secure feel."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "solid surfaceSecondary",
+      "android": "solid surfaceSecondary",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Auth (Login/Register)",
+      "purpose": "Zero-knowledge authentication gate with visible key generation indicators.",
+      "states": {
+        "loading": "Spinner centered with 'Deriving cryptographic keys...' monospace text.",
+        "empty": "N/A",
+        "error": "Full-width surfaceSecondary block with red accent border and retry CTA."
+      },
+      "layout": "Header features the app logo/lock symbol. Inputs are flat, border-bottom only or contained within strict surfaceTertiary boxes. Password derivation should have a visual progress/status indicator to emphasize 'we are generating keys, not just logging in'. Primary CTA pinned to thumb zone."
+    },
+    {
+      "name": "Chats List",
+      "purpose": "Primary inbox prioritizing state visibility (encrypted status, active timers).",
+      "states": {
+        "loading": "Skeleton rows (avatar circle + two text bars).",
+        "empty": "Abstract cryptographic texture background with a primary CTA 'Initiate Secure Connection'.",
+        "error": "Banner at the top indicating 'Connection Interrupted' with a manual refresh button."
+      },
+      "layout": "Standard list rows with real user avatars (initials as fallback). Row includes name (Rajdhani, bold), message preview, timestamp. Crucially, each row features a persistent lock icon to confirm encryption state. Use strict divider lines between rows."
+    },
+    {
+      "name": "Chat Conversation",
+      "purpose": "End-to-end encrypted messaging view with disappearing timers and security validation.",
+      "states": {
+        "loading": "Centered spinner on surface canvas.",
+        "empty": "Secure lock icon with 'End-to-end encrypted. Keys generated.' subtext.",
+        "error": "Message fails to send: red exclamation icon next to bubble."
+      },
+      "layout": "Header contains contact name, avatar, and a distinct lock icon that can be tapped to view safety numbers. Message bubbles use tight md radius, not pill-shaped. Sent bubbles use surfaceSecondary; received use surfaceTertiary. Disappearing message indicators (e.g., small clock icon with '5m') live tightly next to message timestamps. Input bar is flat, anchored above the keyboard."
+    },
+    {
+      "name": "Settings & Profile (Key Verification)",
+      "purpose": "Display security fingerprints, manage session state, and user settings.",
+      "states": {
+        "loading": "Skeleton rows.",
+        "empty": "N/A",
+        "error": "Error loading session data, 'Regenerate Session' action."
+      },
+      "layout": "Tactical dashboard. Key fingerprints displayed in a prominent monospace block (surfaceTertiary) with a copy action. Toggles for default disappearing message durations. Destructive 'Destroy Session / Logout' button styled with an error accent outline."
+    }
+  ],
+  "images": {
+    "auth_bg": {
+      "url": "https://images.unsplash.com/photo-1770486036751-e55247238964?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzV8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGNyeXB0b2dyYXBoaWMlMjBsb2NrJTIwc2VjdXJpdHklMjB0ZXh0dXJlJTIwZGFyayUyMGJhY2tncm91bmR8ZW58MHx8fHwxNzkxMzgyODM5fDA&ixlib=rb-4.1.0&q=85",
+      "alt": "Abstract cryptographic lock texture for auth and empty states"
+    },
+    "avatar_1": {
+      "url": "https://images.unsplash.com/photo-1518725522904-4b3939358342?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MjJ8MHwxfHNlYXJjaHwzfHxwb3J0cmFpdCUyMHBob3RvZ3JhcGh5JTIwb2YlMjB5b3VuZyUyMGRpdmVyc2UlMjBwZW9wbGUlMjBmYWNlc3xlbnwwfHx8fDE3OTEzODI4Mzl8MA&ixlib=rb-4.1.0&q=85",
+      "alt": "Dummy contact avatar 1"
+    },
+    "avatar_2": {
+      "url": "https://images.unsplash.com/photo-1520529277867-dbf8c5e0b340?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MjJ8MHwxfHNlYXJjaHxfHxwb3J0cmFpdCUyMHBob3RvZ3JhcGh5JTIwb2YlMjB5b3VuZyUyMGRpdmVyc2UlMjBwZW9wbGUlMjBmYWNlc3xlbnwwfHx8fDE3OTEzODI4Mzl8MA&ixlib=rb-4.1.0&q=85",
+      "alt": "Dummy contact avatar 2"
+    },
+    "avatar_3": {
+      "url": "https://images.unsplash.com/photo-1724225618359-a1d2763326f9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MjJ8MHwxfHNlYXJjaHw0fHxwb3J0cmFpdCUyMHBob3RvZ3JhcGh5JTIwb2YlMjB5b3VuZyUyMGRpdmVyc2UlMjBwZW9wbGUlMjBmYWNlc3xlbnwwfHx8fDE3OTEzODI4Mzl8MA&ixlib=rb-4.1.0&q=85",
+      "alt": "Dummy contact avatar 3"
+    }
+  },
+  "haptics": {
+    "auth_submit": "impactMedium",
+    "chat_send": "impactLight",
+    "disappearing_timer_toggle": "selection",
+    "tab_switch": "selection",
+    "copy_fingerprint": "notificationSuccess"
+  },
+  "instructions_to_main_agent": [
+    "Execute the 'Dark-First Utility' structure strictly: do NOT use glassmorphism or blur effects anywhere; rely entirely on solid tonal blocks (surfaceSecondary, surfaceTertiary) to create depth.",
+    "Color palette restriction is absolute: NEVER use blue, navy, indigo, or purple anywhere in the UI. The app relies on a deep obsidian/charcoal base with a single Acid Lime (#CCFF00) accent to communicate the cyberpunk/cryptographic secure state.",
+    "State visibility is key: The header of every chat must persistently show an encryption lock indicator. The chat list must explicitly show an encrypted state indicator for each thread.",
+    "Typography: Use Rajdhani for metrics, headers, and key fingerprints. Use Satoshi for standard chat bubble readability. Do NOT exceed a font weight of 500.",
+    "Chat bubbles must be tactical (sm/md border radius) and not overly rounded pill shapes.",
+    "Implement haptics mapped to security states (e.g., locking a chat, submitting the master password, setting a disappearing message timer)."
+  ]
+}
