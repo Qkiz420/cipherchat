@@ -9,14 +9,19 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.encryptedmessenger.nrm2c4"
+      "bundleIdentifier": "com.emergent.encryptedmessenger.nrm2c4",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Unlock your encrypted chats with Face ID",
+        "NSPhotoLibraryUsageDescription": "Share encrypted photos in your chats"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.emergent.encryptedmessenger.nrm2c4"
+      "package": "com.emergent.encryptedmessenger.nrm2c4",
+      "permissions": ["USE_BIOMETRIC", "USE_FINGERPRINT", "POST_NOTIFICATIONS"]
     },
     "web": {
       "bundler": "metro",
@@ -39,7 +44,11 @@
       "expo-secure-store",
       "expo-web-browser",
       "expo-status-bar",
-      "@react-native-vector-icons/ionicons"
+      "@react-native-vector-icons/ionicons",
+      "expo-sharing",
+      "expo-notifications",
+      ["expo-local-authentication", { "faceIDPermission": "Unlock your encrypted chats with Face ID" }],
+      ["expo-image-picker", { "photosPermission": "Share encrypted photos in your chats" }]
     ],
     "experiments": {
       "typedRoutes": true

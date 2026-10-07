@@ -2,12 +2,13 @@ import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, Switch, Text, View } from "react-native";
 import Animated, { FadeInDown, FadeOut } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth, useSession } from "@/src/auth";
 import { keyFingerprint } from "@/src/crypto";
+import { useLock } from "@/src/lock";
 import { usesNativeTabs } from "@/src/navigation";
 import { fonts, makeStyles, radius, spacing, useTheme } from "@/src/theme";
 import { Avatar, Ionicons } from "@/src/ui";
@@ -19,6 +20,9 @@ const LAYERS: { icon: any; title: string; text: string }[] = [
   { icon: "finger-print-outline", title: "Signed messages", text: "Ed25519 signatures prove who sent each message and that nobody altered it." },
   { icon: "resize-outline", title: "Length padding", text: "Messages are padded to fixed-size blocks so their length leaks nothing." },
   { icon: "timer-outline", title: "Self-destruct", text: "Disappearing messages are erased from the server automatically when they expire." },
+  { icon: "document-lock-outline", title: "Encrypted attachments", text: "Photos and files are sealed on your phone with a one-time key before upload." },
+  { icon: "people-outline", title: "Group key rotation", text: "When members change, new members can't read history and removed members can't read new messages." },
+  { icon: "notifications-off-outline", title: "Content-free alerts", text: "Push notifications only say \"New message\" — no names, no text." },
 ];
 
 export default function SettingsScreen() {
@@ -32,6 +36,32 @@ export default function SettingsScreen() {
   const [confirm, setConfirm] = useState(false);
   const bottomChrome = usesNativeTabs ? insets.bottom : 0;
   const fp = keyFingerprint(identity.boxPub, identity.signPub);
+  const lock = useLock();
+
+  const flash = (m: string) => {
+    setToast(m);
+    setTimeout(() => setToast(null), 1800);
+  };
+
+  const toggleLock = async (v: boolean) => {
+    Haptics.selectionAsync();
+    if (v) router.push("/set-pin");
+    else {
+      await lock.disable();
+      flash("App lock off");
+    }
+  };
+
+  const toggleBio = async (v: boolean) => {
+    Haptics.selectionAsync();
+    const ok = await lock.setBio(v);
+    if (!ok) flash("Biometric check failed");
+  };
+
+  const toggleShots = async (v: boolean) => {
+    Haptics.selectionAsync();
+    await lock.setBlockShots(v);
+  };
 
   const copy = async () => {
     await Clipboard.setStringAsync(fp);
@@ -67,6 +97,55 @@ export default function SettingsScreen() {
             <Text style={styles.copyText}>Tap to copy · compare in person to verify</Text>
           </View>
         </Pressable>
+
+        <Text style={styles.section}>PRIVACY & LOCK</Text>
+        <View style={styles.card}>
+          <View style={styles.layer}>
+            <Ionicons name="keypad-outline" size={18} color={colors.brandPrimary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.layerTitle}>App lock (PIN)</Text>
+              <Text style={styles.layerText}>Require a 6-digit PIN whenever CipherChat opens or returns from background.</Text>
+            </View>
+            <Switch
+              testID="app-lock-switch"
+              value={lock.enabled}
+              onValueChange={toggleLock}
+              trackColor={{ true: colors.brandPrimary, false: colors.borderStrong }}
+              thumbColor={colors.onSurface}
+            />
+          </View>
+          <View style={[styles.layer, styles.layerBorder, !(lock.enabled && lock.bioAvailable) && { opacity: 0.5 }]}>
+            <Ionicons name="scan-outline" size={18} color={colors.brandPrimary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.layerTitle}>Face ID / fingerprint</Text>
+              <Text style={styles.layerText}>
+                {Platform.OS === "web" ? "Available on phones only." : lock.bioAvailable ? "Unlock faster with biometrics. PIN stays as backup." : "No biometrics set up on this device."}
+              </Text>
+            </View>
+            <Switch
+              testID="biometric-switch"
+              value={lock.bio}
+              disabled={!(lock.enabled && lock.bioAvailable)}
+              onValueChange={toggleBio}
+              trackColor={{ true: colors.brandPrimary, false: colors.borderStrong }}
+              thumbColor={colors.onSurface}
+            />
+          </View>
+          <View style={[styles.layer, styles.layerBorder]}>
+            <Ionicons name="camera-reverse-outline" size={18} color={colors.brandPrimary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.layerTitle}>Block screenshots</Text>
+              <Text style={styles.layerText}>Blocks screenshots & screen recording and hides the app preview. Works in installed builds only, not Expo Go.</Text>
+            </View>
+            <Switch
+              testID="block-screenshots-switch"
+              value={lock.blockShots}
+              onValueChange={toggleShots}
+              trackColor={{ true: colors.brandPrimary, false: colors.borderStrong }}
+              thumbColor={colors.onSurface}
+            />
+          </View>
+        </View>
 
         <Text style={styles.section}>SECURITY LAYERS ACTIVE</Text>
         <View style={styles.card}>

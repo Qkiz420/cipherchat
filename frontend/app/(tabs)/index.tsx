@@ -22,17 +22,19 @@ export default function ChatsScreen() {
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ["chats"],
     queryFn: () => api<ChatT[]>("/chats"),
-    refetchInterval: 3000,
+    refetchInterval: 15000,
   });
 
   const preview = (chat: ChatT) => {
     const m = chat.last_message;
     if (!m) return "No messages yet";
+    if (m.kind === "system") return m.system_text ?? "";
     const sender = chat.members.find((x) => x.id === m.sender_id);
     const dec = decryptMessage(m, identity, sender?.sign_pub);
     if (!dec) return "Unable to decrypt";
     const prefix = m.sender_id === user.id ? "You: " : chat.type === "group" ? `${sender?.display_name ?? "?"}: ` : "";
-    return prefix + dec.text;
+    const body = dec.att ? (dec.att.kind === "image" ? "Encrypted photo" : `File · ${dec.att.name}`) : dec.text;
+    return prefix + body;
   };
 
   const renderItem = ({ item }: { item: ChatT }) => {

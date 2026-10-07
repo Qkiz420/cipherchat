@@ -1,8 +1,10 @@
 import type { WireMessage } from "./crypto";
 
 const BASE = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api`;
+export const WS_URL = `${BASE.replace(/^http/, "ws")}/ws`;
 
 let token: string | null = null;
+export const getToken = () => token;
 let onUnauthorized: (() => void) | null = null;
 
 export function setToken(t: string | null) {
@@ -58,6 +60,7 @@ export type ChatT = {
   name: string | null;
   created_by: string;
   disappear_seconds: number;
+  key_epoch: number;
   members: PublicUser[];
   last_message: WireMessage | null;
   created_at: string;

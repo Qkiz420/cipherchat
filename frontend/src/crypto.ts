@@ -30,10 +30,23 @@ export type EncryptedMessage = {
   keys: Record<string, { n: string; k: string }>;
   sig: string;
 };
+export type AttachmentMeta = {
+  id: string;
+  k: string;
+  n: string;
+  name: string;
+  mime: string;
+  size: number;
+  kind: "image" | "file";
+  w?: number;
+  h?: number;
+};
 export type WireMessage = {
   id: string;
   chat_id: string;
   sender_id: string;
+  kind?: "msg" | "system";
+  system_text?: string | null;
   ciphertext: string;
   nonce: string;
   epk: string;
@@ -43,7 +56,20 @@ export type WireMessage = {
   created_at: string;
   expires_at: string | null;
 };
-export type Decrypted = { text: string; verified: boolean } | null;
+export type Decrypted = { text: string; verified: boolean; att?: AttachmentMeta } | null;
+
+export { b64, unb64 };
+
+/** Encrypt raw file bytes with a fresh one-time key (key travels only inside the E2E message). */
+export function encryptBytes(bytes: Uint8Array) {
+  const key = nacl.randomBytes(32);
+  const nonce = nacl.randomBytes(24);
+  return { ct: nacl.secretbox(bytes, nonce, key), k: b64(key), n: b64(nonce) };
+}
+
+export function decryptBytes(ct: Uint8Array, k: string, n: string): Uint8Array | null {
+  return nacl.secretbox.open(ct, unb64(n), unb64(k));
+}
 
 function concat(...parts: Uint8Array[]): Uint8Array {
   const out = new Uint8Array(parts.reduce((s, p) => s + p.length, 0));
@@ -117,10 +143,11 @@ export function encryptMessage(
   chatId: string,
   members: PublicMember[],
   me: Identity,
+  att?: AttachmentMeta,
 ): EncryptedMessage {
   const msgKey = nacl.randomBytes(32);
   const nonce = nacl.randomBytes(24);
-  const body = pad(decodeUTF8(JSON.stringify({ t: text, ts: Date.now() })));
+  const body = pad(decodeUTF8(JSON.stringify({ t: text, ts: Date.now(), ...(att ? { a: att } : {}) })));
   const ciphertext = b64(nacl.secretbox(body, nonce, msgKey));
   const eph = nacl.box.keyPair();
   const keys: EncryptedMessage["keys"] = {};
@@ -144,7 +171,7 @@ export function decryptMessage(msg: WireMessage, me: Identity, senderSignPub?: s
       const msgKey = nacl.box.open(unb64(msg.key.k), unb64(msg.key.n), unb64(msg.epk), unb64(me.boxSec));
       const plain = msgKey && nacl.secretbox.open(unb64(msg.ciphertext), unb64(msg.nonce), msgKey);
       if (plain) {
-        const { t } = JSON.parse(encodeUTF8(unpad(plain)));
+        const { t, a } = JSON.parse(encodeUTF8(unpad(plain)));
         const verified =
           !!senderSignPub &&
           nacl.sign.detached.verify(
@@ -152,7 +179,7 @@ export function decryptMessage(msg: WireMessage, me: Identity, senderSignPub?: s
             unb64(msg.sig),
             unb64(senderSignPub),
           );
-        result = { text: String(t), verified };
+        result = { text: String(t ?? ""), verified, ...(a ? { att: a as AttachmentMeta } : {}) };
       }
     }
   } catch {
@@ -160,6 +187,14 @@ export function decryptMessage(msg: WireMessage, me: Identity, senderSignPub?: s
   }
   if (result) cache.set(msg.id, result);
   return result;
+}
+
+export const randomSalt = () => b64(nacl.randomBytes(16));
+
+export function hashPin(pin: string, salt: string): string {
+  let h = nacl.hash(decodeUTF8(`${salt}:${pin}`));
+  for (let i = 0; i < 500; i++) h = nacl.hash(h);
+  return hex(h.slice(0, 32));
 }
 
 /** Short fingerprint of one identity (hex groups). */

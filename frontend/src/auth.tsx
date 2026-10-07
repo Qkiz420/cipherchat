@@ -1,8 +1,11 @@
+import { Redirect } from "expo-router";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, View } from "react-native";
 
 import { api, MeUser, setToken, setUnauthorizedHandler } from "./api";
 import { deriveKeys, generateIdentity, Identity, openVault, sealVault } from "./crypto";
 import { queryClient } from "./query-client";
+import { colors } from "./theme";
 import { storage } from "./utils/storage";
 
 const SESSION_KEY = "cipherchat_session";
@@ -10,6 +13,7 @@ const SESSION_KEY = "cipherchat_session";
 type Session = { token: string; user: MeUser; identity: Identity };
 type AuthState = {
   status: "loading" | "out" | "in";
+  token: string | null;
   user: MeUser | null;
   identity: Identity | null;
   login: (username: string, password: string) => Promise<void>;
@@ -97,6 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthState>(
     () => ({
       status,
+      token: session?.token ?? null,
       user: session?.user ?? null,
       identity: session?.identity ?? null,
       login,
@@ -119,4 +124,20 @@ export function useAuth() {
 export function useSession() {
   const { user, identity } = useAuth();
   return { user: user!, identity: identity! };
+}
+
+/** Renders the screen only once the session is restored (avoids null identity on cold reload). */
+export function withSession<P extends object>(Screen: React.ComponentType<P>) {
+  return function SessionScreen(props: P) {
+    const { status, user, identity } = useAuth();
+    if (status === "out") return <Redirect href="/auth" />;
+    if (status !== "in" || !user || !identity) {
+      return (
+        <View style={{ flex: 1, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator color={colors.brandPrimary} />
+        </View>
+      );
+    }
+    return <Screen {...props} />;
+  };
 }

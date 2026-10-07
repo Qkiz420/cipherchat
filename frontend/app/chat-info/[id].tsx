@@ -1,16 +1,19 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api, ChatT } from "@/src/api";
-import { useSession } from "@/src/auth";
+import { useSession, withSession } from "@/src/auth";
 import { keyFingerprint, safetyNumber } from "@/src/crypto";
 import { fonts, makeStyles, radius, spacing, useTheme } from "@/src/theme";
 import { Avatar, chatTitle, fmtTtl, Ionicons, otherMember } from "@/src/ui";
 
-export default function ChatInfoScreen() {
+export default withSession(ChatInfoScreen);
+
+function ChatInfoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const styles = useStyles();
   const { colors } = useTheme();
@@ -18,6 +21,34 @@ export default function ChatInfoScreen() {
   const router = useRouter();
   const { user } = useSession();
   const { data: chat } = useQuery({ queryKey: ["chat", id], queryFn: () => api<ChatT>(`/chats/${id}`) });
+  const qc = useQueryClient();
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const isGroup = chat?.type === "group";
+  const isAdmin = isGroup && chat?.created_by === user.id;
+
+  const removeMember = async (memberId: string) => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await api(`/chats/${id}/members/${memberId}`, { method: "DELETE" });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setConfirmId(null);
+      qc.invalidateQueries({ queryKey: ["chats"] });
+      if (memberId === user.id) {
+        qc.removeQueries({ queryKey: ["chat", id] });
+        router.dismissAll();
+        router.replace("/(tabs)");
+      } else {
+        await qc.invalidateQueries({ queryKey: ["chat", id] });
+      }
+    } catch (e: any) {
+      setErr(e?.message ?? "Action failed");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const other = chat ? otherMember(chat, user.id) : undefined;
   const safety = chat?.type === "direct" && other ? safetyNumber(user, other) : null;
@@ -62,7 +93,25 @@ export default function ChatInfoScreen() {
             </>
           )}
 
-          <Text style={styles.section}>MEMBERS · IDENTITY KEYS</Text>
+          <View style={styles.sectionRow}>
+            <Text style={styles.sectionInline}>MEMBERS · IDENTITY KEYS</Text>
+            {isAdmin && (
+              <Pressable
+                testID="add-members-button"
+                onPress={() => router.push({ pathname: "/add-members/[id]", params: { id } })}
+                style={styles.addBtn}
+              >
+                <Ionicons name="person-add-outline" size={14} color={colors.onBrandTertiary} />
+                <Text style={styles.addText}>Add</Text>
+              </Pressable>
+            )}
+          </View>
+          {isGroup && (
+            <Text style={styles.epoch} testID="key-epoch">
+              Key epoch {chat.key_epoch} · keys rotate whenever members change
+            </Text>
+          )}
+          {err && <Text style={styles.err} testID="chat-info-error">{err}</Text>}
           <View style={styles.card}>
             {chat.members.map((m, i) => (
               <View key={m.id} style={[styles.member, i > 0 && styles.memberBorder]} testID={`member-${m.username}`}>
@@ -71,18 +120,43 @@ export default function ChatInfoScreen() {
                   <Text style={styles.memberName}>
                     {m.display_name}
                     {m.id === user.id ? " (you)" : ""}
+                    {isGroup && m.id === chat.created_by ? "  · ADMIN" : ""}
                   </Text>
                   <Text style={styles.fp}>{keyFingerprint(m.box_pub, m.sign_pub)}</Text>
                 </View>
+                {isAdmin && m.id !== user.id &&
+                  (confirmId === m.id ? (
+                    <Pressable testID={`confirm-remove-${m.username}`} disabled={busy} onPress={() => removeMember(m.id)} style={styles.removeConfirm}>
+                      <Text style={styles.removeConfirmText}>{busy ? "…" : "Remove"}</Text>
+                    </Pressable>
+                  ) : (
+                    <Pressable testID={`remove-member-${m.username}`} onPress={() => setConfirmId(m.id)} style={styles.removeBtn}>
+                      <Ionicons name="person-remove-outline" size={18} color={colors.error} />
+                    </Pressable>
+                  ))}
               </View>
             ))}
           </View>
+          {isGroup && (
+            <Pressable
+              testID={confirmId === user.id ? "confirm-leave-group" : "leave-group-button"}
+              disabled={busy}
+              onPress={() => (confirmId === user.id ? removeMember(user.id) : setConfirmId(user.id))}
+              style={[styles.leave, confirmId === user.id && { backgroundColor: colors.error }]}
+            >
+              <Ionicons name="exit-outline" size={18} color={confirmId === user.id ? colors.onError : colors.error} />
+              <Text style={[styles.leaveText, confirmId === user.id && { color: colors.onError }]}>
+                {confirmId === user.id ? "CONFIRM · LEAVE GROUP" : "LEAVE GROUP"}
+              </Text>
+            </Pressable>
+          )}
 
           <Text style={styles.section}>PROTOCOL</Text>
           <View style={styles.block}>
             {[
               ["Key exchange", "X25519 (ephemeral per message)"],
               ["Cipher", "XSalsa20-Poly1305 · 256-bit"],
+              ["Attachments", "One-time key per file"],
               ["Signatures", "Ed25519"],
               ["Padding", "128-byte blocks"],
               ["Server access", "Ciphertext only"],
@@ -126,6 +200,17 @@ const useStyles = makeStyles((c) => ({
   member: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md },
   memberBorder: { borderTopWidth: 1, borderTopColor: c.divider },
   memberName: { fontFamily: fonts.textMedium, fontSize: 14, color: c.onSurface },
+  sectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing.xl, marginBottom: spacing.sm },
+  sectionInline: { fontFamily: fonts.display, fontSize: 13, letterSpacing: 1.5, color: c.muted },
+  addBtn: { flexDirection: "row", alignItems: "center", gap: 4, height: 36, paddingHorizontal: spacing.md, borderRadius: radius.sm, backgroundColor: c.brandTertiary },
+  addText: { fontFamily: fonts.textMedium, fontSize: 13, color: c.onBrandTertiary },
+  epoch: { fontFamily: fonts.mono, fontSize: 10, color: c.brandPrimary, marginBottom: spacing.sm },
+  err: { fontFamily: fonts.text, fontSize: 13, color: c.error, marginBottom: spacing.sm },
+  removeBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  removeConfirm: { height: 36, paddingHorizontal: spacing.md, borderRadius: radius.sm, backgroundColor: c.error, alignItems: "center", justifyContent: "center" },
+  removeConfirmText: { fontFamily: fonts.textMedium, fontSize: 13, color: c.onError },
+  leave: { marginTop: spacing.lg, height: 48, borderRadius: radius.sm, borderWidth: 1, borderColor: c.error, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm },
+  leaveText: { fontFamily: fonts.display, fontSize: 15, letterSpacing: 1.5, color: c.error },
   fp: { fontFamily: fonts.mono, fontSize: 10, color: c.muted, marginTop: 2 },
   kv: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6 },
   k: { fontFamily: fonts.text, fontSize: 13, color: c.muted },

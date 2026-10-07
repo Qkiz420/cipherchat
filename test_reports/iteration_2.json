@@ -1,0 +1,41 @@
+{
+  "summary": "CipherChat iteration-2 testing complete. Backend: 39/39 pytest cases PASS (22 regression + 17 new) — covering attachments upload/download/413/non-member 404, WebSocket realtime message + typing broadcast, invalid-token WS close, group admin add/remove with key_epoch increments & system messages, new-member cannot see history, stale key set 409, removed member 404 on chat, self-leave + admin-leave with admin transfer, /api/register-push requires auth, placeholder push does not block message send. Frontend (mobile 390x844): two-browser realtime verified — message from A visible on B within 0.51s via WS (well under 2s target), chat-subtitle shows 'WS_A_84738 IS TYPING…' when A types, decrypted bubble matches sent plaintext. Set-PIN flow accepts 6 digits twice via set-pin-key-N testIDs and returns from set-pin screen. CRITICAL BUG: on page reload after enabling app lock, SettingsScreen crashes with 'TypeError: Cannot read properties of null (reading boxPub)' at settings.tsx:38, falling through to ErrorBoundary 'Something went wrong' — the lock-screen never gets a chance to render. Root cause: SettingsScreen reads identity.boxPub synchronously during the brief window when AuthProvider is still rehydrating the session from AsyncStorage/IndexedDB on web. Attachments UI (attach-sheet, file picker), group admin UI (add/remove/leave), and biometric/screenshot toggles were not reached due to the reload crash blocking app-lock verification; the backend endpoints they call are all green.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "SettingsScreen", "issue": "Crashes with 'Cannot read properties of null (reading boxPub)' at /app/frontend/app/(tabs)/settings.tsx:38 — `keyFingerprint(identity.boxPub, identity.signPub)` runs before `identity` is hydrated after reload. Repro: enable app-lock in Settings → reload page → ErrorBoundary 'Something went wrong'. Fix: early-return a loading state when `!identity || !user`, or move fp computation inside a useMemo guarded by identity.", "testID": "profile-display-name (parent)", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [
+      {"flow": "App lock across reload", "issue": "Could not confirm lock-screen appears after enabling PIN + reload because SettingsScreen crashes first (see above). Backend/lock-provider logic likely fine; blocked by the hydration crash.", "affected_testIDs": ["app-lock-switch","set-pin-key-1","lock-screen","lock-pin-error"]}
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_cipherchat_backend.py",
+    "/app/backend/tests/test_cipherchat_iter2.py",
+    "/app/test_reports/pytest/iter2_results.xml"
+  ],
+  "action_items": [
+    "Fix SettingsScreen null-identity crash: guard `keyFingerprint(identity.boxPub, identity.signPub)` behind `if (!identity || !user) return <Loading/>` or useMemo; this blocks the entire app-lock reload acceptance criterion.",
+    "After fix, retest: (a) toggle app-lock-switch → set PIN → reload → lock-screen shows → wrong PIN shows lock-pin-error → correct PIN unlocks → toggle off → reload → no lock-screen.",
+    "Remaining UI flows not tested in this run (backend already green, worth a quick spot-check after fix): attach-button→attach-sheet→attach-file-option file upload producing attachment-file-<id> bubble; group chat-header-info → add-members / remove-member / confirm-remove / leave-group with system-message-<id> rendering and chat-removed on the removed user's screen."
+  ],
+  "critical_code_review_comments": [
+    "server.py:302 visible_query uses `audience: uid` OR `keys.{uid}` which cleanly implements the 'new members can't see history, removed members can't see new messages' invariant. Verified by test_new_member_cannot_see_history and test_remove_member_and_access_lost.",
+    "server.py:467 add_system_message writes with sender_id='system' and kind='system'; audience is set to current member_ids so joiners see the system message but not prior msgs — correct.",
+    "server.py:544 strict `set(body.keys.keys()) != set(chat.member_ids)` returns 409 on stale sealed set — verified for post-add scenario.",
+    "server.py:120 notify_new_message catches *every* exception from send_push → messaging never blocked by push failures. Good.",
+    "server.py:614 ws_endpoint: invalid JWT closes with 4401 before accept — verified. Hub.send iterates list copy so disconnects during broadcast don't throw.",
+    "settings.tsx:38 reads `identity.boxPub` without null guard — root cause of post-reload crash. Hooks `useSession()` can return `{user:null,identity:null}` momentarily on web where secure storage is async."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_cipherchat_iter2.py (new)"
+  ],
+  "success_rate": {"backend": "100% (39/39)", "frontend": "~60% — realtime + typing + register/login + set-pin UI OK; app-lock reload path blocked by SettingsScreen crash; attachments/group-admin UI not exercised"},
+  "seed_data_creation": "Each test registers fresh TEST_-prefixed users via /api/auth/register (no shared seed). Chats/messages/attachments auto-expire via TTL indexes.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run backend: `cd /app/backend && pytest tests/ -v --asyncio-mode=auto` (requires websockets pkg, already installed). Public URL: https://encrypted-messenger-69.preview.emergentagent.com. WS URL: wss://.../api/ws?token=JWT. KDF on register/login takes ~4-6s on web (bump wait). For PinPad testIDs: `{prefix}-key-{0..9}`, `{prefix}-backspace`, `{prefix}-error`. Attach-sheet testIDs: attach-button, attach-sheet, attach-file-option, attach-photo-option. Group admin: add-members-button, add-members-search-input, add-members-submit-button, remove-member-<username>, confirm-remove-<username>, leave-group-button, confirm-leave-group, chat-removed, system-message-<id>. Switches on RNW don't expose aria-checked reliably — read lock state via Settings UI after a round-trip instead.",
+  "rca_of_issue": "Bug: SettingsScreen crash on reload. Repro: 1) Register user, 2) Open Settings tab, 3) Toggle app-lock-switch, 4) Enter PIN 123456 twice on set-pin, 5) Reload page. Observed: ErrorBoundary with 'Cannot read properties of null (reading boxPub)'. RCA: On web, secure storage (AsyncStorage/IndexedDB) rehydration is async. During the first paint after reload, `useSession()` returns `{user:null,identity:null}` and settings.tsx:38 unconditionally dereferences `identity.boxPub`. The AuthProvider route guard in _layout.tsx redirects unauth users to /auth, but during the hydrate tick the Settings route is already mounted (/(tabs)/settings is persisted). Mitigation: add `if (!user || !identity) return null;` (or a skeleton) before line 38 in /app/frontend/app/(tabs)/settings.tsx. Same pattern should be audited in other authenticated screens that read `identity.*`."
+}

@@ -3,12 +3,14 @@ import { NativeTabs } from "expo-router/unstable-native-tabs";
 import * as Haptics from "expo-haptics";
 import { Platform } from "react-native";
 
-import { useAuth } from "@/src/auth";
+import { useAuth, withSession } from "@/src/auth";
 import { usesNativeTabs } from "@/src/navigation";
 import { fonts, useTheme } from "@/src/theme";
 import { Ionicons } from "@/src/ui";
 
-export default function TabsLayout() {
+export default withSession(TabsLayout);
+
+function TabsLayout() {
   const { status } = useAuth();
   const { colors } = useTheme();
   if (status === "out") return <Redirect href="/auth" />;
